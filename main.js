@@ -104,8 +104,8 @@ async function connectServer() {
   socket.on('connect_error', () => { process.exit(0); });
   socket.on('connect', () => {
     console.log(`Connection established with ${data.server}:${data.serverPort}.`);
-    console.log(`Verifying server identity.`);
-    let randomVerificationNumber = crypto.randomBytes(64);
+    //console.log(`Verifying server identity.`);
+    //let randomVerificationNumber = crypto.randomBytes(64);
   });
 }
 
