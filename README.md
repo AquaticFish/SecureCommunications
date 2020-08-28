@@ -4,7 +4,6 @@ Plans are to make this project hybrid in a sense that one can directly communica
 
 ### Todo
 
-- [ ] Ability for client to verify server 'identity' via the server's public key.
 - [ ] Ability for the client and server to generate their own private and public keys, if needed.
 - [ ] Server support for multiple individuals, message relaying, public-private key encryption between different server members, end-to-end encryption.
 - [ ] (Maybe) chat commands.
@@ -16,6 +15,7 @@ Plans are to make this project hybrid in a sense that one can directly communica
 ### In Progress
 
 - [ ] Websockets. Ability for client to communicate with server.
+- [ ] Ability for client to verify server 'identity' via the server's public key.
 
 ### Done ✓
 
