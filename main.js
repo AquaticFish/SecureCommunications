@@ -5,6 +5,13 @@ var openpgp = require('openpgp');
 var WebSocket = require('ws');
 
 const isIP = str => (/^(?:https?\:\/\/)?(?:\d\.?){3}\d(?:\:\d+)?\/?$/).test(str);
+const extract = str => str.match(/(?<=\s)[A-z\+\/=]+/)?.[0];
+function getChunks(number, size) {
+  let string = number.toString(),
+      length = string.length - size + 1;
+      
+  return Array.from({ length }, (_,i) => +string.slice(i, i + size))
+}
 
 async function configConnection() {
   let data;
@@ -27,11 +34,6 @@ async function configConnection() {
         type: 'input',
         message: 'Enter server public key:',
         name: 'serverPublicKey'
-      },
-      {
-        type: 'input',
-        message: 'Enter your public key:',
-        name: 'clientPublicKey'
       },
       {
         type: 'input',
@@ -73,7 +75,7 @@ async function config() {
     data = await inquirer.prompt([
       {
         type: 'number',
-        message: '\n[1]: Connect to server\n[2]: Generate new ECC key pair and save to file\n[3]: Nuke existing key pairs\n',
+        message: '\n[1]: Connect to server\n[2]: Generate new ECC key pair and save to config\n[3]: Nuke existing key pairs\n',
         name: 'configChoice'
       },
       {
@@ -97,6 +99,30 @@ async function config() {
   return data;
 }
 
+async function connectionEvents(ws) {
+  ws.on('open', function open() {
+    console.clear(); console.log(`[!]: Connection established with ${data.server}`);
+  });
+   
+  ws.on('message', function incoming(data) {
+    let parsedData;
+    try {
+      parsedData = JSON.parse(data);
+      if (parsedData.type) {
+        switch (parsedData.type) {
+          case "messageRelay": {
+            
+          }
+        }
+      } else {
+        console.error('[!]: Received message from server but it did not contain the type');
+      }
+    } catch(err) {
+      console.error('[!]: Received message from server but could not parse the data');
+    }
+  });
+}
+
 
 async function connectServer() {
   let data = await configConnection();
@@ -107,23 +133,49 @@ async function connectServer() {
   } else {
     ws = new WebSocket(data.server);
   }
-  ws.on('open', function open() {
-    console.clear(); console.log(`Connection established with ${data.server}`);
-  });
-   
-  ws.on('message', function incoming(data) {
-    let parsedData;
-    try {
-      parsedData = JSON.parse(data);
-      if (parsedData.type) {
+  connectionEvents(ws);
+}
 
-      } else {
-        console.error('Received message from server but it did not contain the type');
-      }
-    } catch(err) {
-      console.error('Received message from server but could not parse the data');
-    }
-  });
+async function generateKeys() {
+  let hash = crypto.createHash('sha1');
+  let { modulusLength } = await inquirer.prompt([{
+    type: 'number',
+    message: 'Enter RSA key size:',
+    name: 'modulusLength'
+  }]);
+  const [ err, publicKey, privateKey ] = await (new Promise(resolve => {
+    crypto.generateKeyPair(
+      'rsa',
+      { modulusLength },
+      (...args) => resolve(args)
+    );
+  }));
+  if (err) {
+    console.log('Failed to generate key pair');
+    console.error(err);
+  }
+  try {
+    await fs.promises.writeFile(
+      'key',
+      privateKey.export({ type: 'pkcs8', format: 'pem' })
+    );
+    await fs.promises.writeFile(
+      'key.pub',
+      publicKey.export({ type: 'spki', format: 'pem' })
+    );
+    await fs.promises.writeFile(
+      'fingerprint',
+      [ ...hash.update(publicKey.export({
+        type: 'spki',
+        format: 'der'
+      })).digest() ].map(v => v.toString(16).padStart(2, '0')).join(':')
+    );
+  }
+  catch (err) {
+    console.log('Could not save file(s).');
+    console.error(err);
+  }
+  return [ publicKey, privateKey ];
 }
 
 async function main() {
@@ -133,7 +185,7 @@ async function main() {
     retry = false;
     switch (data.configChoice) {
       case 1: console.clear(); connectServer(); break;
-      case 2: console.clear(); console.log("Not available"); retry = true; break;
+      case 2: console.clear(); generateKeys(); break;
       case 3: console.clear(); console.log("Not available"); retry = true; break;
       default: console.clear(); console.log("Invalid input"); retry = true; break;
     }
