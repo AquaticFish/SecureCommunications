@@ -6,18 +6,19 @@ Plans are to make this project hybrid in a sense that one can directly communica
 
 - [ ] Ability for the client and server to generate their own private and public keys, if needed.
 - [ ] Server support for multiple individuals, message relaying, public-private key encryption between different server members, end-to-end encryption.
-- [ ] (Maybe) chat commands.
-- [ ] Ability for server to store and save messages.
+- [ ] Ability for server to store and save messages using SQLite.
 - [ ] Rename project to something more creative.
-- [ ] Additional utilities: message notifications and more.
-- [ ] Upgraded / reworked UI, ability to be able to access multiple servers at once, possibly an electron or react based UI, or a greatly expanded CLI one.
+- [ ] Channels, different servers at once, permissions.
+- [ ] Chat commands, ability to integrate applications / 'bots'.
+- [ ] Additional utilities to assist with general usability, notifications, sounds, etc.
+- [ ] Reworked CLI UI, utilizing react-blessed.
 
 ### In Progress
 
-- [ ] Websockets. Ability for client to communicate with server.
 - [ ] Ability for client to verify server 'identity' via the server's public key.
 
 ### Done ✓
 
 - [x] Theorize the workings of the project.
 - [x] Implement basic user input.
+- [x] Websockets. Ability for client to communicate with server.
