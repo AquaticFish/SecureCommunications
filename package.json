@@ -1,0 +1,26 @@
+{
+  "name": "securecommunications",
+  "version": "1.0.0",
+  "description": "Open-source project managed by two individuals that aims to create a platform for secure, private and decentralized communications. Plans are to make this project hybrid in a sense that one can directly communicate with someone else in a P2P manner, or talk to a group of individuals in a self-hosted server, all with public-private key end-to-end encryption.",
+  "main": "main.js",
+  "dependencies": {
+    "debug": "^4.1.1",
+    "express": "^4.17.1",
+    "inquirer": "^7.3.3",
+    "openpgp": "^4.10.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aquaticfish/securecommunications.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aquaticfish/securecommunications/issues"
+  },
+  "homepage": "https://github.com/aquaticfish/securecommunications#readme"
+}

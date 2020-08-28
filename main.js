@@ -1,10 +1,10 @@
-var app = require('express')();
-var https = require('https').createServer(app);
 var inquirer = require('inquirer');
 var fs = require('fs');
-var io = require('socket.io-client');
 var crypto = require('crypto');
 var openpgp = require('openpgp');
+var WebSocket = require('ws');
+
+const isIP = str => (/^(?:https?\:\/\/)?(?:\d\.?){3}\d(?:\:\d+)?\/?$/).test(str);
 
 async function configConnection() {
   let data;
@@ -100,12 +100,29 @@ async function config() {
 
 async function connectServer() {
   let data = await configConnection();
-  var socket = io(`${data.server}:${data.serverPort}`);
-  socket.on('connect_error', () => { process.exit(0); });
-  socket.on('connect', () => {
-    console.log(`Connection established with ${data.server}:${data.serverPort}.`);
-    //console.log(`Verifying server identity.`);
-    //let randomVerificationNumber = crypto.randomBytes(64);
+  let ws;
+  console.clear(); console.log("Attempting to connect to server...");
+  if (isIP(data.server)) {
+    ws = new WebSocket(`http://${data.server}:${data.serverPort}/`);
+  } else {
+    ws = new WebSocket(data.server);
+  }
+  ws.on('open', function open() {
+    console.clear(); console.log(`Connection established with ${data.server}`);
+  });
+   
+  ws.on('message', function incoming(data) {
+    let parsedData;
+    try {
+      parsedData = JSON.parse(data);
+      if (parsedData.type) {
+
+      } else {
+        console.error('Received message from server but it did not contain the type');
+      }
+    } catch(err) {
+      console.error('Received message from server but could not parse the data');
+    }
   });
 }
 
@@ -120,20 +137,7 @@ async function main() {
       case 3: console.clear(); console.log("Not available"); retry = true; break;
       default: console.clear(); console.log("Invalid input"); retry = true; break;
     }
-} while(retry);
+  } while (retry);
 }
 
 main();
-
-
-/*app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
-
-io.on('connection', (socket) => {
-  console.log('a user connected');
-});
-
-http.listen(3000, () => {
-  console.log('listening on *:3000');
-});*/
