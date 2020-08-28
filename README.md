@@ -4,7 +4,6 @@ Plans are to make this project hybrid in a sense that one can directly communica
 
 ### Todo
 
-- [ ] Ability for the client and server to generate their own private and public keys, if needed.
 - [ ] Server support for multiple individuals, message relaying, public-private key encryption between different server members, end-to-end encryption.
 - [ ] Ability for server to store and save messages using SQLite.
 - [ ] Rename project to something more creative.
@@ -15,6 +14,7 @@ Plans are to make this project hybrid in a sense that one can directly communica
 
 ### In Progress
 
+- [ ] Ability for the client and server to generate their own private and public keys, if needed.
 - [ ] Ability for client to verify server 'identity' via the server's public key.
 
 ### Done ✓
