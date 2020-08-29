@@ -4,14 +4,11 @@ var crypto = require('crypto');
 var openpgp = require('openpgp');
 var WebSocket = require('ws');
 
-const isIP = str => (/^(?:https?\:\/\/)?(?:\d\.?){3}\d(?:\:\d+)?\/?$/).test(str);
-const extract = str => str.match(/(?<=\s)[A-z\+\/=]+/)?.[0];
-function getChunks(number, size) {
-  let string = number.toString(),
-    length = string.length - size + 1;
+var eventBase = require('./modules/eventBase');
+const e = require('express');
 
-  return Array.from({ length }, (_, i) => +string.slice(i, i + size))
-}
+const isDomain = str => (/^(?:https?\:\/\/)?(?:(?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}\/?$/).test(str);
+const extract = str => str.match(/(?<=\s)[A-z\+\/=]+/)?.[0];
 
 async function configConnection() {
   let data;
@@ -99,51 +96,79 @@ async function config() {
   return data;
 }
 
-async function connectionEvents(ws, configData) { // This is a disaster, gonna need major cleanup, it's 2 am
+async function serverValidation(ws, configData) { 
+  console.clear(); console.log(`[!]: Connection established with ${configData.server}`);
+  if (configData.serverFingerprint) {
+    await ws.send(JSON.stringify({type: "REQUEST_SERVER_KEY"}));
+    let { key } = JSON.parse(await require('events').once(eventBase, 'RETURN_SERVER_KEY'));
+    let fingerprint = crypto.createHash('sha1').update(extract(key)).digest().map(v => v.toString(16).padStart(2, '0')).join(':');
+    if (configData.serverFingerprint == fingerprint) {
+      console.log(`[!]: Fingerprints match, proceeding to verify that the server is the key holder`);
+      let nonce = crypto.randomBytes(16).toString('hex');
+      await ws.send(JSON.stringify({type: "REQUEST_SERVER_AUTHENTICATION", nonce: await crypto.publicEncrypt(key, Buffer.from(nonce))}));
+      let { returnedNonce } = JSON.parse(await require('events').once(eventBase, 'RETURN_SERVER_AUTHENTICATION'));
+      if (returnedNonce == nonce) {
+        return true;
+      } else {
+        console.error(`[!]: Server authentication failed, server returned invalid nonce. Terminating.`); ws.terminate();
+      }
+    }
+  } else {
+    console.error(`[!]: No server public key fingerprint provided, not checking server authenticity. This is not very secure.`)
+  }
+}
+
+/*
+async function serverValidation(ws, configData) { 
+  console.clear(); console.log(`[!]: Connection established with ${configData.server}`);
+  if (configData.serverFingerprint) {
+    ws.send(JSON.stringify({type: "requestServerPublicKey"}));
+    let e1 = ws.on('message', function incoming(data) {
+      let parsedData;
+      try { parsedData = JSON.parse(data); } catch { console.error("[!]: Received nonsensical data from server while expecting response to authentication request. Terminating."); ws.terminate(); };
+      if (parsedData.type && parsedData.type == "returnServerPublicKey") {
+        let expectedFingerprint = configData.serverFingerprint;
+        let receivedFingerprint = crypto.createHash('sha1').update(extract(parsedData.key)).digest().map(v => v.toString(16).padStart(2, '0')).join(':');
+        if (expectedFingerprint == receivedFingerprint) {
+          let nonce = crypto.randomBytes(16);
+          let encryptedNonce = crypto.publicEncrypt(parsedData.key, Buffer.from(nonce));
+          ws.send(JSON.stringify(
+            {
+              type: "requestServerAuthentication",
+              encryptedNonce: encryptedNonce
+            }
+          ));
+          let e2 = ws.on('message', function incoming(data2) {
+            try { parsedData2 = JSON.parse(data2); } catch { console.error("[!]: Received nonsensical data from server while expecting response to authentication request. Terminating."); ws.terminate(); };
+            if (parsedData2.type && parsedData2.type == "returnServerAuthentication") {
+              if (parsedData2.decryptedNonce == nonce) {
+                // uhhh
+              } else {
+                console.error("[!]: Server returned incorrect decrypted nonce. This likely means that the server IP/domain has been hijacked. Terminating."); ws.terminate();
+              }
+            } {
+              console.error("[!]: Received JSON data from server, but it either did not return the nonce or there was no data type provided. Terminating."); ws.terminate();
+            }
+          });
+        } {
+          console.error(`[!]: Fingerprints mismatch\nExpected: ${expectedFingerprint}\nReceived: ${receivedFingerprint}\nTerminating connection.`); ws.terminate();
+        }
+      } else {
+        console.error("[!]: Received JSON data from server, but it either did not return the public key or there was no data type provided. Terminating."); ws.terminate();
+      }
+    });
+  } else {
+    console.error(`[!]: No server public key fingerprint provided, not checking server authenticity. This is not very secure.`)
+  }
+}
+*/
+
+async function connectionEvents(ws, configData) {
+  let serverAuthenticated = false;
   ws.on('open', function open() {
-    console.clear();
-    console.log(`[!]: Connection established with ${configData.server}`);
+    console.clear(); console.log(`[!]: Connection established with ${configData.server}`);
     if (configData.serverFingerprint) {
-      ws.send(JSON.stringify(
-        {
-          type: "requestServerPublicKey"
-        }
-      ));
-      let e1 = ws.on('message', function incoming(data) {
-        let parsedData;
-        let hash = crypto.createHash('sha1');
-        try { parsedData = JSON.parse(data); } catch { console.error("[!]: Received nonsensical data from server while expecting response to authentication request. Terminating."); ws.terminate(); };
-        if (parsedData.type && parsedData.type == "returnServerPublicKey") {
-          let expectedFingerprint = configData.serverFingerprint;
-          let receivedFingerprint = hash.update(extract(parsedData.key)).digest().map(v => v.toString(16).padStart(2, '0')).join(':');
-          if (expectedFingerprint == receivedFingerprint) {
-            let nonce = crypto.randomBytes(16);
-            let encryptedNonce = crypto.publicEncrypt(parsedData.key, Buffer.from(nonce));
-            ws.send(JSON.stringify(
-              {
-                type: "requestServerAuthentication",
-                encryptedNonce: encryptedNonce
-              }
-            ));
-            let e2 = ws.on('message', function incoming(data2) {
-              try { parsedData2 = JSON.parse(data2); } catch { console.error("[!]: Received nonsensical data from server while expecting response to authentication request. Terminating."); ws.terminate(); };
-              if (parsedData2.type && parsedData2.type == "returnServerAuthentication") {
-                if (parsedData2.decryptedNonce == nonce) {
-                  // uhhh
-                } else {
-                  console.error("[!]: Server returned incorrect decrypted nonce. This likely means that the server IP/domain has been hijacked. Terminating."); ws.terminate();
-                }
-              } {
-                console.error("[!]: Received JSON data from server, but it either did not return the nonce or there was no data type provided. Terminating."); ws.terminate();
-              }
-            });
-          } {
-            console.error(`[!]: Fingerprints mismatch\nExpected: ${expectedFingerprint}\nReceived: ${receivedFingerprint}\nTerminating connection.`); ws.terminate();
-          }
-        } else {
-          console.error("[!]: Received JSON data from server, but it either did not return the public key or there was no data type provided. Terminating."); ws.terminate();
-        }
-      });
+      serverAuthenticated = serverValidation(ws, configData);
     } else {
       console.error(`[!]: No server public key fingerprint provided, not checking server authenticity. This is not very secure.`)
     }
@@ -178,7 +203,7 @@ async function connectServer() {
   } else {
     ws = new WebSocket(data.server);
   }
-  connectionEvents(ws, data);
+  eventBase.init(ws); connectionEvents(ws, data);
 }
 
 async function generateKeys() {
